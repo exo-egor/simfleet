@@ -711,7 +711,8 @@ export async function removeLaneReverse(session: FleetSession): Promise<void> {
   if (!toolchain.adbPath) return;
   const serial = await serialForAvd(session.simulatorUdid).catch(() => null);
   if (!serial) return;
-  await adb(toolchain.adbPath, ["-s", serial, "reverse", "--remove", `tcp:${session.port}`], 5_000);
+  const devicePort = PROJECT_CONFIG.metro?.driver === "react-native" ? 8081 : session.port;
+  await adb(toolchain.adbPath, ["-s", serial, "reverse", "--remove", `tcp:${devicePort}`], 5_000);
 }
 
 /**
@@ -760,18 +761,30 @@ export async function configureAndLaunchAndroid(
   const installed = await adb(adbPath, ["-s", serial, "shell", "pm", "path", packageName]);
   if (!installed.stdout.includes("package:")) {
     throw new DeviceStateError(
-      `${packageName} is not installed on ${session.simulatorUdid}. Install the Android development client first (for example \`bunx expo run:android --device ${session.simulatorUdid}\` in the worktree).`,
+      `${packageName} is not installed on ${session.simulatorUdid}. Install the Android debug app first.`,
     );
   }
+  const reactNative = PROJECT_CONFIG.metro?.driver === "react-native";
+  const devicePort = reactNative ? 8081 : session.port;
   const reverse = await adb(adbPath, [
     "-s",
     serial,
     "reverse",
-    `tcp:${session.port}`,
+    `tcp:${devicePort}`,
     `tcp:${session.port}`,
   ]);
   if (reverse.exitCode !== 0) throw commandError(reverse, "adb reverse failed");
   await adb(adbPath, ["-s", serial, "shell", "am", "force-stop", packageName]);
+  if (reactNative) {
+    const launch = PROJECT_CONFIG.android?.activity
+      ? await adb(adbPath, ["-s", serial, "shell", "am", "start", "-W", "-n", PROJECT_CONFIG.android.activity])
+      : await adb(adbPath, ["-s", serial, "shell", "monkey", "-p", packageName,
+        "-c", "android.intent.category.LAUNCHER", "1"]);
+    if (launch.exitCode !== 0 || /Error:|Exception/.test(launch.stdout)) {
+      throw Object.assign(commandError(launch, "Android launch failed"), { status: 409 });
+    }
+    return { serial, package: packageName, scheme: "launcher" };
+  }
   const scheme = await devClientScheme(adbPath, serial, packageName, session);
   const bundleUrl = encodeURIComponent(`http://127.0.0.1:${session.port}`);
   const launch = await adb(adbPath, [

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- React Native CLI debug lanes with configurable Metro commands and app directories, including
+  prebuilt iOS debug app installation and Android port forwarding.
+- Simulator Open falls back to Xcode's DeviceHub when Simulator.app is absent.
+
 ## [0.1.0] - 2026-09-28
 
 ### Added

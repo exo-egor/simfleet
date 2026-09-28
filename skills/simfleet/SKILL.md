@@ -57,7 +57,8 @@ the HTTP/WebSocket contract.
   (development/staging/preprod/production) select runtime JS config and never force a native build.
 - **JS-first.** For ordinary React Native changes: start a lane, wait for Metro, launch. Build natively
   only when native inputs changed, and only through `native plan` / `native ensure` (fingerprinted,
-  single-flight, shared across agents) — never `expo run:ios`, CocoaPods, or Xcode directly.
+  single-flight, shared across agents) for Expo projects. React Native CLI projects use their
+  configured `metro.command` and prebuilt debug app; run their native workflow after native changes.
 - Work in existing worktrees. Create one only when asked, via `simfleet worktree create`.
 - Stop only lanes you started.
 
@@ -67,8 +68,8 @@ the HTTP/WebSocket contract.
 simfleet status && simfleet ports                          # 1. inspect ownership first
 simfleet sim boot <udid>                                   # 2. or: simfleet emu boot <avd>
 simfleet claim <udid> "testing checkout on feature-x"      # 3.
-simfleet native plan <abs-worktree> debug <udid>           # 4. iOS: expect a cache hit for JS-only work
-simfleet native ensure <abs-worktree> <udid> debug
+simfleet native plan <abs-worktree> debug <udid>           # 4. Expo iOS: expect a cache hit for JS-only work
+simfleet native ensure <abs-worktree> <udid> debug         #    React Native CLI: configure debug.artifactPath instead
 simfleet lane start <abs-worktree> <udid-or-avd> [environment] [debug|release]   # 5.
 simfleet lane launch <lane-id>                             # 6. waits for Metro health
 simfleet lane open-url <lane-id> <path-or-url>             #    uses the mode's scheme

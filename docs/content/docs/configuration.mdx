@@ -31,7 +31,7 @@ simfleet runs against the nearest directory containing `.sim-fleet/project.json`
   Display name; also the default for host state and cache directory names.
 </ParamField>
 <ParamField body="nativeShells" type="object" required>
-  The `debug` and `release` native apps. Each has `appName`, `bundleId`, and `scheme`, plus optional `legacySchemes` (extra schemes to try when opening links), `androidPackage` (when it differs from `bundleId`), and `googleServicesFile` (checked to match `bundleId`). Bundle identifiers must not contain worktree suffixes.
+  The `debug` and `release` native apps. Each has `appName`, `bundleId`, and `scheme`, plus optional `legacySchemes` (extra schemes to try when opening links), `androidPackage` (when it differs from `bundleId`), and `googleServicesFile` (checked to match `bundleId`). React Native CLI projects may set `debug.artifactPath` to a prebuilt iOS simulator `.app` relative to the worktree; it is installed when absent. Bundle identifiers must not contain worktree suffixes.
 </ParamField>
 <ParamField body="environments" type="object" required>
   `development`, `staging`, `preprod`, and `production`, each with a non-overlapping `portRange` and an optional `envFile`.
@@ -43,7 +43,7 @@ simfleet runs against the nearest directory containing `.sim-fleet/project.json`
   `{ provider, allowedAppIdentifiers }`. Every native shell's `bundleId` must be listed; `native plan` reports whether the installed app is.
 </ParamField>
 <ParamField body="simslimProfile" type="string">
-  Path to a SimSlim profile JSON applied on every iOS boot.
+  Path to a SimSlim profile JSON applied on every iOS boot. `SIM_FLEET_SIMSLIM_PROFILE` overrides it for one host.
 </ParamField>
 <ParamField body="autoSlim" type="boolean" default="true">
   Slim devices booted outside the fleet. See [Always slim](/docs/always-slim).
@@ -58,7 +58,7 @@ simfleet runs against the nearest directory containing `.sim-fleet/project.json`
   Process names the dashboard treats as your app when attributing simulator memory.
 </ParamField>
 <ParamField body="metro" type="object">
-  `env` and `modeEnv.debug` / `modeEnv.release`: environment variables for Metro and release bundling. Values can use `{environment}`, `{mode}`, and `{port}` (`embedded` for release).
+  `driver` is `expo` (default) or `react-native`. React Native CLI projects set `cwd` to the app directory relative to the worktree and `command` to an executable and arguments, for example `["pnpm", "metro", "--port", "{port}"]`. Arguments run directly, without a shell. `env` and `modeEnv.debug` / `modeEnv.release` set environment variables. Values can use `{environment}`, `{mode}`, and `{port}` (`embedded` for Expo release).
 </ParamField>
 <ParamField body="release.entryFile" type="string">
   Entry file for release bundles. By default the first of `index.ts`, `index.tsx`, or `index.js` that exists.

@@ -24,6 +24,10 @@ Returns the lane. Release lanes have `port: null` and `metroPid: null`. Creation
 | `GET /api/v1/lanes/{laneId}/log?maxCharacters=20000` | Metro log tail (plain text) |
 | `POST /api/v1/lanes/{laneId}/stop` | Stops only the Metro process group this lane owns and releases the lease |
 
+React Native CLI projects may set `metro.driver`, `metro.cwd`, and `metro.command` in the project
+config. Their debug lane starts that command with the leased port. Expo remains the default. Release
+lanes currently support Expo only.
+
 ## `POST /api/v1/worktrees`
 
 ```json

@@ -21,7 +21,7 @@ POST /api/v1/simulators/{udid}/boot       # body { "stock": true } boots without
 POST /api/v1/simulators/{udid}/slim
 POST /api/v1/simulators/{udid}/restore
 POST /api/v1/simulators/{udid}/shutdown
-POST /api/v1/simulators/{udid}/open       # show in Simulator.app
+POST /api/v1/simulators/{udid}/open       # show in Simulator.app, or Xcode DeviceHub if absent
 ```
 
 Each returns `202` with a `job` and `pollUrl` (`GET /api/v1/simulators/jobs/{jobId}`). Boots succeed only after `simslim verify` confirms the profile, with one automatic retry; cold boots can take a few minutes when several devices contend for CoreSimulator. `restore` and stock boots record an opt-out from [auto-slim](/docs/always-slim); `slim` and a normal boot clear it.

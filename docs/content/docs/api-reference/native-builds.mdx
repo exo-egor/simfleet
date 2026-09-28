@@ -8,6 +8,8 @@ description: Plan and ensure cached native builds.
 Query: `worktreePath`, `mode` (`debug` or `release`), and optionally `simulatorUdid`.
 
 Reports the native fingerprint, cache hit or miss, the cached artifact, whether it is installed on the simulator, the Google services file, and whether the installed app identifier is declared in `nativeAuth`. Builds nothing.
+These endpoints support Expo projects. React Native CLI projects receive `400`; their debug lanes
+can install a prebuilt app from `nativeShells.debug.artifactPath`.
 
 ## `POST /api/v1/native-builds/ensure`
 

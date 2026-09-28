@@ -8,6 +8,7 @@ import {
   PROJECT_CONFIG,
   getVariant,
   projectBundleEnv,
+  resolveMetroCommand,
   type AppEnvironment,
   type BuildMode,
 } from "./config";
@@ -552,47 +553,38 @@ export function isProcessRunning(pid: number): boolean {
 }
 
 export function startMetro(session: FleetSession & { port: number }): number {
-  const expoBinary = path.join(session.worktreePath, "node_modules", ".bin", "expo");
-  if (!fs.existsSync(expoBinary)) {
-    throw new Error(`Expo CLI is missing in ${session.worktreePath}/node_modules`);
+  const launch = resolveMetroCommand(PROJECT_CONFIG.metro, session.worktreePath, {
+    environment: session.environment,
+    mode: session.mode,
+    port: session.port,
+  });
+  if (!fs.existsSync(launch.cwd)) {
+    throw new Error(`Metro working directory is missing: ${launch.cwd}`);
+  }
+  if (launch.command.includes(path.sep) && !fs.existsSync(launch.command)) {
+    throw new Error(`Metro executable is missing: ${launch.command}`);
   }
   const log = fs.openSync(session.logPath, "a");
-  const child = spawn(
-    expoBinary,
-    [
-      "start",
-      "--dev-client",
-      "--localhost",
-      "--port",
-      String(session.port),
-      "--max-workers",
-      String(FLEET_CONFIG.metroMaxWorkers),
-    ],
-    {
-      cwd: session.worktreePath,
-      detached: true,
-      env: {
-        ...process.env,
-        NODE_ENV: "development",
-        ...projectBundleEnv({
-          environment: session.environment,
-          mode: session.mode,
-          port: session.port,
-        }),
-        METRO_PORT: String(session.port),
-        EXPO_NO_DOTENV: "1",
-        EXPO_NO_INTERACTIVE: "1",
-        // `expo start --localhost` binds whatever "localhost" resolves to, and
-        // Node's verbatim DNS order picks [::1] on macOS. The RN dev client
-        // rewrites its packager host to 127.0.0.1, so an IPv6-only Metro is
-        // unreachable from the app. Force the IPv4 loopback.
-        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
-          .filter(Boolean)
-          .join(" "),
-      },
-      stdio: ["ignore", log, log],
+  const child = spawn(launch.command, launch.args, {
+    cwd: launch.cwd,
+    detached: true,
+    env: {
+      ...process.env,
+      NODE_ENV: "development",
+      ...projectBundleEnv({
+        environment: session.environment,
+        mode: session.mode,
+        port: session.port,
+      }),
+      METRO_PORT: String(session.port),
+      ...(launch.driver === "expo" ? { EXPO_NO_DOTENV: "1", EXPO_NO_INTERACTIVE: "1" } : {}),
+      // The native client uses 127.0.0.1, so keep Metro from binding IPv6 only.
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
+        .filter(Boolean)
+        .join(" "),
     },
-  );
+    stdio: ["ignore", log, log],
+  });
   child.unref();
   fs.closeSync(log);
   if (!child.pid) throw new Error("Metro did not return a process ID");
@@ -602,10 +594,21 @@ export function startMetro(session: FleetSession & { port: number }): number {
 export async function stopManagedMetro(session: FleetSession): Promise<void> {
   if (session.metroPid === null) return;
   if (!isProcessRunning(session.metroPid)) return;
-  const processResult = await run("ps", ["-p", String(session.metroPid), "-o", "command="]);
+  if (session.port === null) throw new Error("A debug lane requires a Metro port");
+  const launch = resolveMetroCommand(PROJECT_CONFIG.metro, session.worktreePath, {
+    environment: session.environment,
+    mode: session.mode,
+    port: session.port,
+  });
+  const [processResult, cwd] = await Promise.all([
+    run("ps", ["-p", String(session.metroPid), "-o", "command="]),
+    cwdForPid(session.metroPid),
+  ]);
   if (
-    !processResult.stdout.includes(session.worktreePath) ||
-    !processResult.stdout.includes("expo")
+    !cwd ||
+    fs.realpathSync(cwd) !== fs.realpathSync(launch.cwd) ||
+    !processResult.stdout.includes(path.basename(launch.command)) ||
+    !processResult.stdout.includes(String(session.port))
   ) {
     throw new Error(`PID ${session.metroPid} no longer belongs to this fleet session`);
   }
@@ -637,6 +640,23 @@ export async function metroHealthy(port: number): Promise<boolean> {
 
 export async function configureAndLaunch(session: FleetSession): Promise<void> {
   if (session.port === null) throw new Error("A debug lane requires a Metro port");
+  if (PROJECT_CONFIG.metro?.driver === "react-native") {
+    const installed = await run("xcrun", [
+      "simctl", "get_app_container", session.simulatorUdid, session.bundleId, "app",
+    ]);
+    if (installed.exitCode !== 0) {
+      const artifact = PROJECT_CONFIG.nativeShells.debug.artifactPath;
+      if (!artifact) {
+        throw new Error(
+          `Install ${session.bundleId} on ${session.simulatorUdid} first, or set nativeShells.debug.artifactPath`,
+        );
+      }
+      const artifactPath = path.resolve(session.worktreePath, artifact);
+      if (!fs.existsSync(artifactPath)) throw new Error(`Debug app is missing: ${artifactPath}`);
+      const install = await run("xcrun", ["simctl", "install", session.simulatorUdid, artifactPath]);
+      if (install.exitCode !== 0) throw new Error(install.stderr.trim() || "Could not install debug app");
+    }
+  }
   const location = `${FLEET_CONFIG.host}:${session.port}`;
   const commands: Array<[string, string[]]> = [
     [
@@ -673,8 +693,9 @@ export async function configureAndLaunch(session: FleetSession): Promise<void> {
         "--terminate-running-process",
         session.simulatorUdid,
         session.bundleId,
-        "--initialUrl",
-        `http://${location}`,
+        ...(PROJECT_CONFIG.metro?.driver === "react-native"
+          ? []
+          : ["--initialUrl", `http://${location}`]),
       ],
     ],
   ];
@@ -700,7 +721,15 @@ export async function simulatorAction(
     return;
   }
   if (action === "open") {
-    result = await run("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", udid]);
+    const selectedXcode = await run("xcode-select", ["-p"]);
+    const developerDirectory = selectedXcode.stdout.trim();
+    const simulatorApp = path.join(developerDirectory, "Applications", "Simulator.app");
+    const deviceHubApp = path.resolve(developerDirectory, "..", "Applications", "DeviceHub.app");
+    result = fs.existsSync(simulatorApp)
+      ? await run("open", ["-a", simulatorApp, "--args", "-CurrentDeviceUDID", udid])
+      : fs.existsSync(deviceHubApp)
+        ? await run("open", ["-a", deviceHubApp])
+        : await run("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", udid]);
   } else if (action === "slim" || action === "boot") {
     const failures: string[] = [];
     for (let attempt = 1; attempt <= 2; attempt += 1) {

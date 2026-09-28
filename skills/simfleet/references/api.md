@@ -50,6 +50,9 @@ Content-Type: application/json
 `environment` is one of `development`, `staging`, `preprod`, or `production`; `mode` is `debug` or
 `release`. `preferredPort` is optional for debug only and is accepted within that environment's range
 when free. Release lanes embed JS and return `port: null`, `metroPid: null`.
+React Native CLI projects can set `metro.driver: "react-native"`, `metro.cwd`, and `metro.command`
+in `.sim-fleet/project.json`; `{port}` in the command becomes the leased port. Their release lanes
+and the native build cache are not currently supported.
 
 - `POST /api/v1/lanes/{laneId}/launch` waits up to 15 seconds for a debug Metro and connects to its
   exact leased URL. Release launch immediately returns a background job and `pollUrl`; poll until the
@@ -69,6 +72,8 @@ from `simulator-creation-options`; the new device remains shut down until booted
 - `POST /api/v1/simulators/{udid}/restore`
 - `POST /api/v1/simulators/{udid}/shutdown`
 - `POST /api/v1/simulators/{udid}/open`
+
+Open uses Simulator.app when present, or Xcode DeviceHub on installations without Simulator.app.
 
 Lifecycle mutations return a background job and `pollUrl`. Poll
 `GET /api/v1/simulators/jobs/{jobId}` until the job is complete. Cold SimSlim boots can take several
@@ -125,7 +130,8 @@ Emulators are addressed by AVD name. `GET /api/v1/status` includes `emulators[]`
   `back`, `app-switcher`, `menu`, `lock`, `power`, `volume-up`, `volume-down`.
 - Operations on an emulator that is not running return `409`.
 - `POST /api/v1/lanes` accepts an AVD name as `simulatorUdid` (or `"platform": "android"`); Android
-  lanes are debug-only and launch through `adb reverse` plus the Expo dev-client deep link.
+  lanes are debug-only. Expo lanes launch through `adb reverse` plus the dev-client deep link;
+  React Native CLI lanes map emulator port 8081 to the leased Metro port and open the app activity.
 
 ## Agent attribution
 

@@ -80,6 +80,34 @@ simfleet emu boot Pixel_8_API_35                      # headless, 2 GB guest RAM
 simfleet lane start "$PWD" Pixel_8_API_35             # adb reverse + dev-client deep link on launch
 ```
 
+### React Native CLI projects
+
+Debug lanes can run a React Native CLI Metro command from a nested app directory. Add this to
+`.sim-fleet/project.json` at the Git repository root:
+
+```jsonc
+{
+  "metro": {
+    "driver": "react-native",
+    "cwd": "apps/mobile/src",
+    "command": ["pnpm", "metro", "--port", "{port}"]
+  },
+  "nativeShells": {
+    "debug": {
+      "appName": "My App", "bundleId": "com.example.app", "scheme": "myapp",
+      "artifactPath": "apps/mobile/node_modules/my-debug-app/MyApp.app"
+    }
+  }
+}
+```
+
+Keep the other required fields from `simfleet init`. The configured command runs in each lane's
+worktree, and `{port}` becomes that lane's leased port. On iOS, launch sets React Native's packager
+address and installs `artifactPath` if the debug app is absent. On Android, launch maps the app's
+default port 8081 to the leased host port and opens its launcher activity. Expo's native build cache
+and release lanes are not available for React Native CLI projects; build a new debug app with your
+project's native workflow when native inputs change.
+
 ## Using the dashboard
 
 Open http://127.0.0.1:8790 (or click the menu-bar icon). The wall shows every simulator and emulator

@@ -50,10 +50,14 @@ Lane creation **fails instead of stealing**: a device, worktree, or port already
 | Android | Supported | Not yet |
 
 Release lanes copy the cached release build and re-bundle it with the lane's environment, so they need no Metro and use less memory.
+They are currently available for Expo projects only. React Native CLI projects use debug lanes with
+their configured Metro command and prebuilt debug app.
 
 ## Android lanes
 
 Android lanes work the same way with an AVD name in place of a UDID. On launch the fleet runs `adb reverse tcp:<port> tcp:<port>` so the emulator reaches Metro on localhost, then opens your dev client with its `expo-development-client` deep link. The dev client must already be installed on the emulator.
+For React Native CLI projects, it instead maps emulator port 8081 to the leased host port and opens the
+installed app's launcher activity (or `android.activity` from the project config).
 
 ## Environments are JavaScript
 

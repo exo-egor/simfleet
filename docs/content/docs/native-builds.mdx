@@ -6,6 +6,11 @@ description: Fingerprinted, single-flight native builds shared by every worktree
 Most branches only change JavaScript. simfleet makes sure those branches reuse an existing native build,
 and that when a native build *is* needed, it happens exactly once no matter how many agents ask.
 
+The fingerprinted native build cache and release rebundling currently support Expo projects. For a
+React Native CLI project, configure `nativeShells.debug.artifactPath` to a prebuilt simulator app.
+Debug lane launch installs it if the app is absent; build a replacement with the project's native
+workflow after native inputs change.
+
 ## How it works
 
 1. **Fingerprint.** simfleet hashes the native inputs of a worktree and excludes application JavaScript: `app.config.js`/`app.json`, dependency declarations in `package.json` (scripts and metadata are ignored), the lockfile, `react-native.config.js`, the `plugins`, `patches`, and `firebase` directories, plus any `nativeFingerprint` paths you declare. The platform, build configuration, CPU architecture, and Xcode version are part of the hash. From the project config only `projectName`, `nativeAuth`, and `nativeShells` count, so changing ports or Metro env never invalidates a build.

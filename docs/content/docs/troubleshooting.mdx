@@ -16,6 +16,9 @@ description: Common problems and how to fix them.
   <Accordion title="lane launch says Metro is not ready">
     `simfleet lane log <lane-id>` shows Metro's output. Fix the real error (often a missing dependency in the worktree) and launch again; the port lease is kept. Do not start another Metro by hand.
   </Accordion>
+  <Accordion title="Open says Simulator.app cannot be found">
+    On Xcode versions that ship DeviceHub without Simulator.app, simfleet opens DeviceHub instead. The browser dashboard can also display and control a booted simulator.
+  </Accordion>
   <Accordion title="Port already in use">
     Run `simfleet ports`. If a lane owns it, stop that lane. If an unmanaged process does, stop it yourself or let the lane take the next free port in the range. simfleet never kills processes it did not start.
   </Accordion>

@@ -105,6 +105,9 @@ export async function nativeBuildPlan(
   mode: BuildMode,
   simulatorUdid?: string,
 ): Promise<NativeBuildPlan> {
+  if (PROJECT_CONFIG.metro?.driver === "react-native") {
+    throw new Error("The native build cache supports Expo projects only; React Native CLI debug lanes can use nativeShells.debug.artifactPath");
+  }
   const configuration = configurationFor(mode);
   const context: NativeContext = {
     platform: "ios",

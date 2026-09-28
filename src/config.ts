@@ -19,6 +19,8 @@ type Variant = {
 
 type NativeShell = Omit<Variant, "portRange"> & {
   legacySchemes?: string[];
+  /** Optional prebuilt simulator app used when launching a React Native CLI lane. */
+  artifactPath?: string;
   /** Android application ID when it differs from the iOS bundle identifier. */
   androidPackage?: string;
 };
@@ -28,6 +30,16 @@ type NativeShell = Omit<Variant, "portRange"> & {
  * renders the same templates with `{port}` set to `embedded`.
  */
 type EnvTemplate = Record<string, string>;
+
+export type MetroSettings = {
+  driver?: "expo" | "react-native";
+  /** Directory relative to the Git worktree containing the app. */
+  cwd?: string;
+  /** Executable and arguments; templates accept {environment}, {mode}, and {port}. */
+  command?: string[];
+  env?: EnvTemplate;
+  modeEnv?: Partial<Record<BuildMode, EnvTemplate>>;
+};
 
 export type ProjectConfigFile = {
   schemaVersion: 1;
@@ -46,10 +58,7 @@ export type ProjectConfigFile = {
   autoSlim?: boolean;
   /** Process names the dashboard treats as "the app" when attributing memory. */
   appProcessNames?: string[];
-  metro?: {
-    env?: EnvTemplate;
-    modeEnv?: Partial<Record<BuildMode, EnvTemplate>>;
-  };
+  metro?: MetroSettings;
   release?: {
     entryFile?: string;
   };
@@ -187,6 +196,8 @@ function defaultDirectoryName(): string {
   return `${projectConfig.projectName} Sim Fleet`;
 }
 
+const simslimProfile = process.env.SIM_FLEET_SIMSLIM_PROFILE || projectConfig.simslimProfile;
+
 export const FLEET_CONFIG = {
   host: "127.0.0.1",
   dashboardPort: Number(process.env.SIM_FLEET_UI_PORT || 8790),
@@ -198,9 +209,7 @@ export const FLEET_CONFIG = {
     "Application Support",
     projectConfig.stateDirectoryName || defaultDirectoryName(),
   ),
-  simslimProfilePath: projectConfig.simslimProfile
-    ? path.resolve(PROJECT_ROOT, projectConfig.simslimProfile)
-    : null,
+  simslimProfilePath: simslimProfile ? path.resolve(PROJECT_ROOT, simslimProfile) : null,
   screenshotRefreshMs: 4000,
 } as const;
 
@@ -216,6 +225,50 @@ export function renderEnvTemplate(
       .replaceAll("{port}", String(values.port));
   }
   return rendered;
+}
+
+export function resolveMetroCommand(
+  settings: MetroSettings | undefined,
+  worktreePath: string,
+  values: { environment: AppEnvironment; mode: BuildMode; port: number },
+): { driver: "expo" | "react-native"; cwd: string; command: string; args: string[] } {
+  const root = path.resolve(worktreePath);
+  const cwd = path.resolve(root, settings?.cwd || ".");
+  const relative = path.relative(root, cwd);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Metro cwd must stay within the worktree");
+  }
+  const driver = settings?.driver || "expo";
+  const configured = settings?.command;
+  if (configured && (!configured.length || configured.some((part) => !part))) {
+    throw new Error("Metro command must contain an executable and nonempty arguments");
+  }
+  if (configured && !configured.some((part) => part.includes("{port}"))) {
+    throw new Error("Metro command must include {port} so each lane uses its leased port");
+  }
+  if (driver === "react-native" && !configured) {
+    throw new Error("React Native CLI lanes require metro.command");
+  }
+  const command = configured || [
+    path.join(cwd, "node_modules", ".bin", "expo"),
+    "start",
+    "--dev-client",
+    "--localhost",
+    "--port",
+    "{port}",
+    "--max-workers",
+    String(FLEET_CONFIG.metroMaxWorkers),
+  ];
+  const rendered = command.map((part) =>
+    part
+      .replaceAll("{environment}", values.environment)
+      .replaceAll("{mode}", values.mode)
+      .replaceAll("{port}", String(values.port)),
+  );
+  const executable = rendered[0].includes(path.sep) && !path.isAbsolute(rendered[0])
+    ? path.resolve(cwd, rendered[0])
+    : rendered[0];
+  return { driver, cwd, command: executable, args: rendered.slice(1) };
 }
 
 /** Project-declared environment for a Metro server or embedded bundle. */

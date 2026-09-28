@@ -16,7 +16,7 @@ description: Install simfleet, describe your app, and run a worktree on a slim d
     ```bash
     simfleet init
     ```
-    This writes `.sim-fleet/project.json`. Set the real bundle identifiers and URL schemes for your debug and release builds. See [Configuration](/docs/configuration) for every field.
+    This writes `.sim-fleet/project.json`. Set the real bundle identifiers and URL schemes for your debug and release builds. React Native CLI apps also set `metro.driver`, `metro.cwd`, and `metro.command`. See [Configuration](/docs/configuration) for every field.
   </Step>
   <Step title="Start the fleet">
     ```bash
@@ -36,7 +36,7 @@ description: Install simfleet, describe your app, and run a worktree on a slim d
     simfleet lane start "$PWD" <udid> development debug
     simfleet lane launch <lane-id>
     ```
-    The lane leases a Metro port from the `development` range, starts Metro in your worktree, waits for it to be healthy, and opens the dev client on that device.
+    The lane leases a Metro port from the `development` range, starts Metro in your worktree, waits for it to be healthy, and opens the app on that device.
   </Step>
 </Steps>
 

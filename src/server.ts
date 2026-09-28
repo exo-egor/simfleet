@@ -544,6 +544,9 @@ async function startSession(request: Request): Promise<Response> {
       "Android release lanes are not supported yet; start a debug lane on the emulator instead",
     );
   }
+  if (PROJECT_CONFIG.metro?.driver === "react-native" && input.mode === "release") {
+    return errorResponse("React Native CLI release lanes are not supported; use a debug lane");
+  }
   const worktrees = await getWorktrees(repoRoot);
   const worktree = worktrees.find((candidate) => candidate.path === input.worktreePath);
   if (!worktree) return errorResponse("Unknown worktree path");
@@ -1118,6 +1121,9 @@ const server = Bun.serve<ControlSocketData>({
         return json({ worktree }, { status: 201 });
       }
       if (request.method === "GET" && url.pathname === "/api/v1/native-builds/plan") {
+        if (PROJECT_CONFIG.metro?.driver === "react-native") {
+          return errorResponse("The native build cache supports Expo projects only");
+        }
         const worktreePath = url.searchParams.get("worktreePath");
         const mode = url.searchParams.get("mode");
         const simulatorUdid = url.searchParams.get("simulatorUdid") || undefined;
@@ -1131,6 +1137,9 @@ const server = Bun.serve<ControlSocketData>({
         return json(await nativeBuildPlan(worktreePath, mode, simulatorUdid));
       }
       if (request.method === "POST" && url.pathname === "/api/v1/native-builds/ensure") {
+        if (PROJECT_CONFIG.metro?.driver === "react-native") {
+          return errorResponse("The native build cache supports Expo projects only");
+        }
         const input = await body(request);
         if (
           typeof input.worktreePath !== "string" ||
